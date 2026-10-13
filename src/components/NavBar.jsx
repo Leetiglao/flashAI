@@ -1,98 +1,55 @@
-import { useState } from 'react'
+import { Brain, ClipboardCheck, Sun, Moon } from 'lucide-react'
 
-function NavBar({ activeTab, onTabChange, isDark, onToggleDark }) {
-  const tabs = [
-    { id: 'flashcards', label: '🧠 Flashcards', icon: '🧠' },
-    { id: 'chatbot', label: '🤖 AI Tutor', icon: '🤖' },
-    { id: 'formbuilder', label: '📝 Form Builder', icon: '📝' },
-  ]
+const TABS = [
+  { id: 'flashcards', label: 'Flashcards', icon: Brain },
+  { id: 'quiz', label: 'Quiz Maker', icon: ClipboardCheck },
+]
 
+export default function NavBar({ activeTab, onTabChange, isDark, onToggleDark }) {
   return (
-    <header
-      className={`border-b sticky top-0 z-50 backdrop-blur-sm ${
-        isDark
-          ? 'border-gray-800 bg-gray-900/90'
-          : 'border-gray-200 bg-white/90'
-      }`}
-    >
-      <div className="max-w-6xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🧠</span>
-            <h1 className="text-xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              FlashAI
-            </h1>
-            <span className="text-xs bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold tracking-wide hidden sm:inline">
-              by Group 6
-            </span>
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white">
+            <Brain size={20} />
           </div>
-
-          {/* Navigation tabs */}
-          <nav className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Right side actions */}
-          <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
-            <button
-              onClick={() => onTabChange(activeTab === 'mobile' ? null : 'mobile')}
-              className="md:hidden p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              ☰
-            </button>
-
-            {/* Dark mode toggle */}
-            <button
-              onClick={onToggleDark}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
-                isDark
-                  ? 'bg-gray-800 hover:bg-gray-700'
-                  : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-              title="Toggle day/night mode"
-            >
-              {isDark ? '🌙' : '☀️'}
-            </button>
+          <div className="hidden leading-tight sm:block">
+            <p className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">
+              FlashAI
+            </p>
+            <p className="text-[11px] font-medium text-slate-400">by Group 6</p>
           </div>
         </div>
 
-        {/* Mobile tabs dropdown */}
-        {activeTab === 'mobile' && (
-          <div className="md:hidden mt-3 bg-gray-100 dark:bg-gray-800 rounded-xl p-2 animate-slide-in">
-            {tabs.map((tab) => (
+        <nav className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const active = activeTab === id
+            return (
               <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-sm font-medium transition ${
-                  activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-600 dark:text-gray-300'
+                key={id}
+                onClick={() => onTabChange(id)}
+                aria-current={active ? 'page' : undefined}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${
+                  active
+                    ? 'bg-white text-indigo-600 shadow-sm dark:bg-slate-800 dark:text-indigo-300'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
                 }`}
               >
-                <span className="text-lg">{tab.icon}</span>
-                <span>{tab.label}</span>
+                <Icon size={16} />
+                {label}
               </button>
-            ))}
-          </div>
-        )}
+            )
+          })}
+        </nav>
+
+        <button
+          onClick={onToggleDark}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          {isDark ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
       </div>
     </header>
   )
 }
-
-export default NavBar

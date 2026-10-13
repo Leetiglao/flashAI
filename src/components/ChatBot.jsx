@@ -1,197 +1,150 @@
-import { useState, useRef, useEffect } from 'react'
-import Groq from 'groq-sdk'
+import { useEffect, useRef, useState } from 'react'
+import { LoaderCircle, MessageSquare, Send, X, Bot } from 'lucide-react'
+import { chat, buildStudyContext } from '../lib/ai'
 
-const groq = new Groq({
-  apiKey: import.meta.env.VITE_GROQ_API_KEY,
-  dangerouslyAllowBrowser: true,
-})
+const GREETING = {
+  role: 'assistant',
+  content:
+    "Hi! I'm your Study Buddy. Ask me anything about your notes, or tap a suggestion below.",
+}
 
-function ChatBot({ notes, cards, isDark }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Hi! I\'m your AI Study Buddy. Ask me anything about your notes or flashcards!',
-    },
-  ])
+const SUGGESTIONS = [
+  'Summarize my notes',
+  'Explain the hardest concept simply',
+  'Quiz me with 3 questions',
+]
+
+export default function ChatBot({ notes, cards }) {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState([GREETING])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const messagesEndRef = useRef(null)
-  const inputRef = useRef(null)
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  const endRef = useRef(null)
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading, open])
 
-  const buildContext = () => {
-    let context = 'You are an AI study tutor helping a student. '
+  async function send(text) {
+    const content = text.trim()
+    if (!content || loading) return
 
-    if (notes.trim()) {
-      context += `\n\nStudent's Notes:\n${notes}`
-    }
-
-    if (cards.length > 0) {
-      context += '\n\nGenerated Flashcards:'
-      cards.forEach((card, i) => {
-        context += `\n${i + 1}. Q: ${card.question} A: ${card.answer}`
-      })
-    }
-
-    context += '\n\nAnswer questions based on the notes and flashcards. Be helpful, encouraging, and educational. If asked about something not in the notes, say so politely and offer to help with what you do know.'
-
-    return context
-  }
-
-  const handleSend = async (e) => {
-    e.preventDefault()
-    if (!input.trim() || loading) return
-
-    const userMessage = input.trim()
+    const next = [...messages, { role: 'user', content }]
+    setMessages(next)
     setInput('')
-    setError(null)
     setLoading(true)
 
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
-
     try {
-      const completion = await groq.chat.completions.create({
-        model: 'openai/gpt-oss-20b',
-        messages: [
-          { role: 'system', content: buildContext() },
-          ...messages.slice(-10).map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: userMessage },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      })
-
-      const response = completion.choices[0].message.content
-      setMessages((prev) => [...prev, { role: 'assistant', content: response }])
+      const reply = await chat(next, buildStudyContext(notes, cards))
+      setMessages([
+        ...next,
+        { role: 'assistant', content: reply || "Hmm, I didn't get a response. Try again?" },
+      ])
     } catch (err) {
       console.error(err)
-      setError('Failed to get response. Please try again.')
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again!' },
+      setMessages([
+        ...next,
+        { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' },
       ])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend(e)
-    }
+  function handleSubmit(e) {
+    e.preventDefault()
+    send(input)
   }
 
   return (
-    <div
-      className={`fixed bottom-24 right-6 w-96 rounded-2xl shadow-2xl border overflow-hidden flex flex-col ${
-        isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      }`}
-      style={{ maxHeight: '60vh', minHeight: '400px' }}
-    >
-      {/* Header */}
-      <div className="bg-indigo-600 text-white px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span>🤖</span>
-          <span className="font-bold text-sm tracking-wide">AI Study Buddy</span>
-          {notes.trim() && (
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">📚 Notes loaded</span>
-          )}
-          {cards.length > 0 && (
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-              🃏 {cards.length} cards
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {error && (
-            <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">
-              ⚠️ Error
-            </span>
-          )}
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('close-chat'))}
-            className="text-white/80 hover:text-white p-1"
-            title="Close chat"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div
-        className="flex-1 overflow-y-auto p-4 space-y-4"
-        style={{ maxHeight: 'calc(60vh - 140px)' }}
+    <>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label={open ? 'Close Study Buddy' : 'Open Study Buddy'}
+        className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition hover:scale-105 hover:bg-indigo-700 active:scale-95 sm:right-6"
       >
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] px-4 py-2.5 rounded-2xl ${
-                msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-md'
-                  : isDark
-                  ? 'bg-gray-700 text-gray-100 rounded-bl-md'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-md'
-              }`}
-            >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+        {open ? <X size={24} /> : <MessageSquare size={24} />}
+      </button>
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="p-4 border-t bg-gray-50 dark:bg-gray-900/50">
-        <div className="flex gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask me anything about your notes..."
-            className={`flex-1 resize-none px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-              isDark
-                ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-500'
-                : 'bg-white border-gray-200 text-gray-700'
-            }`}
-            rows={1}
-            style={{ maxRows: 4 }}
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin">⏳</span>
-                <span>Sending...</span>
-              </>
-            ) : (
-              '➤'
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Study Buddy chat"
+          className="animate-slide-in fixed bottom-24 right-4 z-40 flex h-[28rem] max-h-[70vh] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:right-6 sm:w-96 dark:border-slate-700 dark:bg-slate-900"
+        >
+          <div className="flex items-center justify-between bg-indigo-600 px-4 py-3 text-white">
+            <div className="flex items-center gap-2">
+              <Bot size={18} />
+              <span className="text-sm font-bold">Study Buddy</span>
+            </div>
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">
+              {notes.trim() ? 'Notes loaded' : 'No notes yet'}
+            </span>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <p
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                    m.role === 'user'
+                      ? 'rounded-br-md bg-indigo-600 text-white'
+                      : 'rounded-bl-md bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+                  }`}
+                >
+                  {m.content}
+                </p>
+              </div>
+            ))}
+
+            {messages.length === 1 && (
+              <div className="flex flex-wrap gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="rounded-full border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             )}
-          </button>
+
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <LoaderCircle size={16} className="animate-spin text-indigo-600" />
+                Thinking...
+              </div>
+            )}
+            <div ref={endRef} />
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="flex gap-2 border-t border-slate-200 p-3 dark:border-slate-700"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about your notes..."
+              disabled={loading}
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              aria-label="Send message"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send size={16} />
+            </button>
+          </form>
         </div>
-        <p className="text-xs text-center mt-2 text-gray-500 dark:text-gray-400">
-          Press Enter to send, Shift+Enter for new line
-        </p>
-      </form>
-    </div>
+      )}
+    </>
   )
 }
-
-export default ChatBot
